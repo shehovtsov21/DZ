@@ -1,0 +1,282 @@
+#include <iostream>
+
+using namespace std;
+
+int randomNumber()
+{
+    static unsigned int seed = 12345;
+    seed = seed * 1664525u + 1013904223u;
+    return static_cast<int>((seed >> 16) % 9) + 1;
+}
+
+class Point
+{
+    int x;
+    int y;
+
+public:
+    Point(int x = 0, int y = 0) : x(x), y(y) {}
+
+    Point operator+(const Point& p) const
+    {
+        return Point(x + p.x, y + p.y);
+    }
+
+    Point operator-(const Point& p) const
+    {
+        return Point(x - p.x, y - p.y);
+    }
+
+    Point operator*(const Point& p) const
+    {
+        return Point(x * p.x, y * p.y);
+    }
+
+    Point operator/(const Point& p) const
+    {
+        if (p.x == 0 || p.y == 0)
+            throw "Division by zero coordinate";
+        return Point(x / p.x, y / p.y);
+    }
+
+    bool operator<(const Point& p) const
+    {
+        return x < p.x || (x == p.x && y < p.y);
+    }
+
+    bool operator>(const Point& p) const
+    {
+        return p < *this;
+    }
+
+    bool operator==(const Point& p) const
+    {
+        return x == p.x && y == p.y;
+    }
+
+    friend istream& operator>>(istream& in, Point& p)
+    {
+        return in >> p.x >> p.y;
+    }
+
+    friend ostream& operator<<(ostream& out, const Point& p)
+    {
+        return out << '(' << p.x << ", " << p.y << ')';
+    }
+};
+
+template <typename T>
+T randomValue(T*)
+{
+    return T(randomNumber());
+}
+
+Point randomValue(Point*)
+{
+    return Point(randomNumber(), randomNumber());
+}
+
+template <typename T>
+class Matrix
+{
+    int rows;
+    int cols;
+    T* data;
+
+    void checkSize(const Matrix& m) const
+    {
+        if (rows != m.rows || cols != m.cols)
+            throw "Matrix sizes must be equal";
+    }
+
+public:
+    Matrix(int rows = 2, int cols = 2)
+        : rows(rows), cols(cols), data(nullptr)
+    {
+        if (rows <= 0 || cols <= 0)
+            throw "Matrix sizes must be positive";
+        data = new T[static_cast<size_t>(rows) * cols]{};
+    }
+
+    Matrix(const Matrix& m) : Matrix(m.rows, m.cols)
+    {
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                at(i, j) = m.at(i, j);
+    }
+
+    Matrix& operator=(const Matrix& m)
+    {
+        if (this != &m)
+        {
+            Matrix copy(m);
+            int oldRows = rows;
+            int oldCols = cols;
+            T* oldData = data;
+
+            rows = copy.rows;
+            cols = copy.cols;
+            data = copy.data;
+
+            copy.rows = oldRows;
+            copy.cols = oldCols;
+            copy.data = oldData;
+        }
+        return *this;
+    }
+
+    ~Matrix()
+    {
+        delete[] data;
+    }
+
+    T& at(int row, int col)
+    {
+        if (row < 0 || row >= rows || col < 0 || col >= cols)
+            throw "Invalid matrix index";
+        return data[static_cast<size_t>(row) * cols + col];
+    }
+
+    const T& at(int row, int col) const
+    {
+        if (row < 0 || row >= rows || col < 0 || col >= cols)
+            throw "Invalid matrix index";
+        return data[static_cast<size_t>(row) * cols + col];
+    }
+
+    void input()
+    {
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+            {
+                cout << "Element [" << i << "][" << j << "]: ";
+                if (!(cin >> at(i, j)))
+                    throw "Invalid input";
+            }
+    }
+
+    void fillRandom()
+    {
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                at(i, j) = randomValue(static_cast<T*>(nullptr));
+    }
+
+    void show() const
+    {
+        for (int i = 0; i < rows; ++i)
+        {
+            for (int j = 0; j < cols; ++j)
+                cout << at(i, j) << '\t';
+            cout << '\n';
+        }
+    }
+
+    Matrix operator+(const Matrix& m) const
+    {
+        checkSize(m);
+        Matrix result(rows, cols);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                result.at(i, j) = at(i, j) + m.at(i, j);
+        return result;
+    }
+
+    Matrix operator-(const Matrix& m) const
+    {
+        checkSize(m);
+        Matrix result(rows, cols);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                result.at(i, j) = at(i, j) - m.at(i, j);
+        return result;
+    }
+
+    Matrix operator*(const Matrix& m) const
+    {
+        if (cols != m.rows)
+            throw "Invalid sizes for multiplication";
+        Matrix result(rows, m.cols);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < m.cols; ++j)
+                for (int k = 0; k < cols; ++k)
+                    result.at(i, j) = result.at(i, j)
+                        + at(i, k) * m.at(k, j);
+        return result;
+    }
+
+    Matrix operator/(const Matrix& m) const
+    {
+        checkSize(m);
+        Matrix result(rows, cols);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+            {
+                if (m.at(i, j) == T{})
+                    throw "Division by zero";
+                result.at(i, j) = at(i, j) / m.at(i, j);
+            }
+        return result;
+    }
+
+    T getMin() const
+    {
+        T result = at(0, 0);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                if (at(i, j) < result)
+                    result = at(i, j);
+        return result;
+    }
+
+    T getMax() const
+    {
+        T result = at(0, 0);
+        for (int i = 0; i < rows; ++i)
+            for (int j = 0; j < cols; ++j)
+                if (at(i, j) > result)
+                    result = at(i, j);
+        return result;
+    }
+};
+
+int main()
+{
+    try
+    {
+        Matrix<Point> obj1;
+        Matrix<Point> obj2;
+
+        cout << "Enter 4 points for a 2x2 matrix (x y):\n";
+        obj1.input();
+        obj2.fillRandom();
+
+        cout << "\nFirst matrix:\n";
+        obj1.show();
+        cout << "\nRandom matrix:\n";
+        obj2.show();
+
+        cout << "\nSum:\n";
+        (obj1 + obj2).show();
+        cout << "\nDifference:\n";
+        (obj1 - obj2).show();
+        cout << "\nProduct:\n";
+        (obj1 * obj2).show();
+        cout << "\nElement-wise division (integer coordinates):\n";
+        (obj1 / obj2).show();
+
+        cout << "\nMin: " << obj1.getMin();
+        cout << "\nMax: " << obj1.getMax() << '\n';
+
+        Matrix<int> numbers(2, 3);
+        numbers.fillRandom();
+        cout << "\nMatrix<int>:\n";
+        numbers.show();
+    }
+    catch (const char* error)
+    {
+        cerr << "Error: " << error << '\n';
+        return 1;
+    }
+    return 0;
+}
